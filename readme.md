@@ -345,7 +345,7 @@ After reading the file, output all the values in the map using the `forEach` met
    The new list should contain only the elements for which the the predicate returned true.
 2. Write a generic method `map` that takes two parameters: `List<T>` and `Function<T,U>`.
    The method should call the given function with all the elements in the given list and return a new `List<U>` containing the results.
-3. Write a main method that creates a list of strings with some values.
+3. Write a main method that creates a list of strings, each containing some number (e.g `"-100"`, `"100"`).
    Use `map` to convert all numbers to integers.
    Then use `filter` to keep only positive values.
-   Finally output all the values using the `forEach` method of the list.
+   Finally output all the filtered values using the `forEach` method of the list.
