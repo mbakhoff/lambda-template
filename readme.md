@@ -172,6 +172,24 @@ class Sample$1 implements Runnable {
 }
 ```
 
+The method that declares the anonymous class is also transformed to use the compiler-generated class name:
+
+```java
+package app;
+
+public class Sample {
+  public static void main(String[] args) {
+    String answer = "An anonymous class.";
+    Runnable r = new Sample$1(answer);
+    System.out.println(r.getClass().getName()); // app.Sample$1
+  }
+}
+```
+
+Note that if `answer` is changed after `new Sample$1(answer)` is called, then the copy in `Sample$1` won't be updated.
+That's not very obvious from looking at the original code and can easily cause bugs.
+To avoid any confusion, any local variables used by an anonymous inner class must be effectively final or the compiler will complain.
+
 ## Lambdas
 
 Lambda expressions provide a way to implement an interface in a very concise manner.
