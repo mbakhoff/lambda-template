@@ -1,30 +1,63 @@
 # Inner classes, lambdas
 
-## Inner classes
+Here we will look at some of the different ways of implementing interfaces in Java and the tricks the compiler uses when dealing with interfaces.
 
-Java allows declaring classes inside other classes.
-Such classes are called inner classes (nested classes).
-
+A simple imaginary file server will be used as an example.
+The file server can serve files over the network, but it doesn't know which users have access to which files.
+An interface must be implemented to help the server make the permission checks:
 ```java
-package app;
+interface PermissionChecker {
+  boolean hasPermission(Path path, String user);
+}
+```
 
-public class Outer {
+The most basic way to implement it is to create a separate class:
+```java
+class PermissiveChecker implements PermissionChecker {
 
-  public void runOuter() {
-    System.out.println("at outer");
-    new Inner().runInner();
-  }
-
-  public class Inner {
-
-    public void runInner() {
-      System.out.println("at inner");
-    }
+  @Override
+  public boolean hasPermission(Path path, String user) {
+    return true;
   }
 }
 ```
 
-The `Outer.java` file contains two classes, thus the compiler will generate two class files from it: `app/Outer.class` and `app/Outer$Inner.class`.
+The file server can then be configured to use the permission checking logic:
+```java
+public class SimpleApplication {
+  public void start() {
+    PermissionChecker checker = new PermissiveChecker();
+    new FileServer(checker).start();
+  }
+}
+```
+
+## Inner classes
+
+Java allows declaring classes inside other classes.
+Such classes are called inner classes (nested classes).
+Inner classes are often used to implement an interface or extend a class when the functionality is related to the enclosing class.
+
+```java
+package app;
+
+public class SimplerApplication {
+
+  class Checker implements PermissionChecker {
+    @Override
+    public boolean hasPermission(Path path, String user) {
+      return true;
+    }
+  }
+
+  public void start() {
+    PermissionChecker checker = new Checker();
+    new FileServer(checker).start();
+  }
+}
+```
+
+The `SimplerApplication.java` file contains two classes, thus the compiler will generate two class files from it: `app/SimplerApplication.class` and `app/SimplerApplication$Checker.class`.
 
 A class can contain multiple inner classes.
 The top level class is called the **nest host** and the types nested inside it (including the host) are called **nest members**.
@@ -33,32 +66,26 @@ Members of the same nest (nest mates) have unrestricted access to each other, in
 ```java
 package app;
 
-public class Outer {
+public class CountingApplication {
 
-  private int secret = 42;
+  private int filesChecked;
 
-  public void runOuter() {
-    // call private method of nest mate
-    new Inner().tellSecret();
-  }
-
-  private void onSecretExposed() {
-    secret = (int) (Math.random() * 1000);
-  }
-
-  public class Inner {
-
-    private void tellSecret() {
-      // access private field of nest mate
-      System.out.println("secret is " + secret);
-      // call an instance method of enclosing class
-      onSecretExposed();
+  class Checker implements PermissionChecker {
+    @Override
+    public boolean hasPermission(Path path, String user) {
+      filesChecked++; // use private field of enclosing class
+      return true;
     }
+  }
+
+  public void start() {
+    PermissionChecker checker = new Checker();
+    new FileServer(checker).start();
   }
 }
 ```
 
-The methods inside an inner class can also access instance fields and methods of enclosing classes.
+The methods inside an inner class can access member of the enclosing classes.
 To support this, the compiler automatically adds a constructor parameter in the inner class that is used to pass a reference to the instance of the enclosing class.
 
 The compiler will transform the inner class in the previous code sample as follows:
@@ -66,17 +93,17 @@ The compiler will transform the inner class in the previous code sample as follo
 ```java
 package app;
 
-public class Outer$Inner {
+public class CountingApplication$Checker implements PermissionChecker {
 
-  final Outer this$0;
+  final CountingApplication this$0;
 
-  public Outer$Inner(Outer outer) {
-    this$0 = outer;
+  public CountingApplication$Checker(CountingApplication app) {
+    this$0 = app;
   }
 
-  private void tellSecret() {
-    System.out.println("secret is " + this$0.secret);
-    this$0.onSecretExposed();
+  public boolean hasPermission(Path path, String user) {
+    this$0.filesChecked++;
+    return true;
   }
 }
 ```
@@ -86,14 +113,14 @@ The most invasive of the changes is adding the additional constructor parameter 
 This makes it tricky to create instances of the inner class from outside the enclosing class.
 
 ```java
-class SomethingDifferent {
-  static void createInstance() {
-    new Outer.Inner(); // error: missing constructor arg
+class SomeOtherClass {
+  static PermissionChecker createChecker() {
+    return new CountingApplication.Checker(); // error: missing constructor arg
   }
 }
 ```
 
-Note that the name of the class file is `Outer$Inner.class` but the code must use `Outer.Inner`.
+Note that the name of the class file is `CountingApplication$Checker.class` but the code must use `CountingApplication.Checker`.
 That's just how the compiler likes it.
 
 ## Static inner classes
@@ -104,28 +131,30 @@ Adding the static keyword will prevent the compiler from adding the extra constr
 ```java
 package app;
 
-public class Outer {
+public class SimplerApplication {
 
-  public void runBoth() {
-    new Inner1().run();
-    new Inner2().run();
-  }
-
-  public static class Inner1 implements Runnable {
-    public void run() {
-      System.out.println("Inner1");
+  static class Checker implements PermissionChecker {
+    @Override
+    public boolean hasPermission(Path path, String user) {
+      return true;
     }
   }
 
-  public static class Inner2 implements Runnable {
-    public void run() {
-      System.out.println("Inner2");
-    }
+  public void start() {
+    PermissionChecker checker = new Checker();
+    new FileServer(checker).start();
+  }
+}
+
+class SomeOtherClass {
+  static PermissionChecker createChecker() {
+    return new SimplerApplication.Checker(); // this works
   }
 }
 ```
 
 Always prefer static inner classes to non-static inner classes.
+These have less compiler magic and are easier to understand.
 
 ## Anonymous inner classes
 
@@ -134,40 +163,47 @@ Anonymous inner classes are inner classes that are used when a class is needed o
 ```java
 package app;
 
-public class Sample {
-  public static void main(String[] args) {
-    String answer = "An anonymous class.";
-    Runnable r = new Runnable() {
-      public void run() {
-        System.out.println("What am I? " + answer);
+public class SmarterApplication {
+
+  public void start() {
+    Map<Path, String> ownerByPath = Map.of(
+        Path.of("src"), "theCoder",
+        Path.of("docs"), "theWriter"
+    );
+    PermissionChecker checker = new PermissionChecker() {
+      @Override
+      public boolean hasPermission(Path path, String user) {
+        return ownerByPath.get(path).equals(user);
       }
     };
-    System.out.println(r.getClass().getName()); // app.Sample$1
+    new FileServer(checker).start();
   }
 }
 ```
 
-The above code declares a new class that implements `Runnable` and also creates an instance of it.
-The code doesn't specify a name for the class, so the compiler generates a name automatically.
+The above code declares a new class that implements `PermissionChecker` and also creates an instance of it.
+The code doesn't specify a name for the class, so the compiler generates one automatically.
 
 The code inside the anonymous class can use objects from the enclosing scope.
 A constructor is generated for the inner class to pass the necessary references (similar to non-static inner classes).
 
-The compiler would transform the above example so that the answer string is passed to the inner class:
+The compiler would transform the above example so that the owner map is passed to the inner class:
 
 ```java
 package app;
 
-class Sample$1 implements Runnable {
+class SmarterApplication$1 implements PermissionChecker {
 
-  final String val$answer;
+  final SmarterApplication this$0;
+  final Map<Path, String> val$ownerByPath;
 
-  Sample$1(String answer) {
-    val$answer = answer;
+  SmarterApplication$1(SmarterApplication app, Map<Path, String> ownerByPath) {
+    this$0 = app;
+    val$ownerByPath = ownerByPath;
   }
 
-  public void run() {
-    System.out.println("Who am I? " + val$answer);
+  public boolean hasPermission(Path path, String user) {
+    return val$ownerByPath.get(path).equals(user);
   }
 }
 ```
@@ -177,16 +213,20 @@ The method that declares the anonymous class is also transformed to use the comp
 ```java
 package app;
 
-public class Sample {
-  public static void main(String[] args) {
-    String answer = "An anonymous class.";
-    Runnable r = new Sample$1(answer);
-    System.out.println(r.getClass().getName()); // app.Sample$1
+public class SmarterApplication {
+
+  public void start() {
+    Map<Path, String> ownerByPath = Map.of(
+        Path.of("src"), "theCoder",
+        Path.of("docs"), "theWriter"
+    );
+    PermissionChecker checker = new SmarterApplication$1(this, ownerByPath);
+    new FileServer(checker).start();
   }
 }
 ```
 
-Note that if `answer` is changed after `new Sample$1(answer)` is called, then the copy in `Sample$1` won't be updated.
+Note that if `ownerByPath` is reassigned (`ownerByPath = someOtherMap;`) after `new SmarterApplication$1(ownerByPath)` is called, then the reference in `SmarterApplication$1` won't be updated.
 That's not very obvious from looking at the original code and can easily cause bugs.
 To avoid any confusion, any local variables used by an anonymous inner class must be effectively final or the compiler will complain.
 
@@ -194,16 +234,20 @@ To avoid any confusion, any local variables used by an anonymous inner class mus
 
 Lambda expressions provide a way to implement an interface in a very concise manner.
 
-```
+```java
 package app;
 
-public class Sample {
-  public static void main(String[] args) {
-    String answer = "A lambda expression.";
-    Runnable r = () -> {
-      System.out.println("What am I? " + answer);
+public class SmarterApplication {
+
+  public void start() {
+    Map<Path, String> ownerByPath = Map.of(
+        Path.of("src"), "theCoder",
+        Path.of("docs"), "theWriter"
+    );
+    PermissionChecker checker = (Path path, String user) -> {
+      return ownerByPath.get(path).equals(user);
     };
-    r.run(); // What am I? A lambda expression.
+    new FileServer(checker).start();
   }
 }
 ```
@@ -219,30 +263,33 @@ Once again the compiler will transform the code:
 ```
 package app;
 
-public class Sample {
+public class SmarterApplication {
 
   // lambda body
-  private static void lambda$main$0(String answer) {
-    System.out.println("What am I? " + answer);
+  private static boolean lambda$start$0(Map<Path, String> ownerByPath, Path path, String user) {
+    return ownerByPath.get(path).equals(user);
   }
 
-  public static void main(String[] args) {
-    String answer = "A lambda expression.";
-    Runnable r = new Sample$$Lambda$1(answer);
-    r.run();
+  public void start() {
+    Map<Path, String> ownerByPath = Map.of(
+        Path.of("src"), "theCoder",
+        Path.of("docs"), "theWriter"
+    );
+    PermissionChecker checker = new SmarterApplication$$Lambda$1(ownerByPath);
+    new FileServer(checker).start();
   }
 }
 ```
 
 The transformation is similar to how the inner class constructors are modified:
-* Move the lambda method body to a separate method `lambda$main$0`.
+* Move the lambda method body to a separate method `lambda$start$0`.
   If the lambda uses any objects from its enclosing scope, then add method parameters for passing the necessary references.
-* Generate a completely new class `app.Sample$$Lambda$1` that implements `Runnable`.
+* Generate a completely new class `app.SmarterApplication$$Lambda$1` that implements `PermissionChecker`.
   * add a constructor and fields to store any objects that the lambda method body uses.
-  * add the `run` method that calls `lambda$main$0` with the correct arguments.
-* Modify the method that declares the lambda, replace the lambda expression with `new app.Sample$$Lambda$1(...)`.
+  * add the `hasPermission` method that calls `lambda$start$0` with the correct arguments.
+* Modify the method that declares the lambda, replace the lambda expression with `new app.SmarterApplication$$Lambda$1(...)`.
 
-Note that the `app.Sample$$Lambda$1` class is generated at runtime when the lambda is first used, unlike inner classes that are generated at compile time.
+Note that the `app.SmarterApplication$$Lambda$1` class is generated at runtime when the lambda is first used, unlike inner classes that are generated at compile time.
 The exact implementation is quite tricky.
 Those who are interested can search for `LambdaMetafactory` and `invokedynamic`.
 
@@ -251,22 +298,18 @@ Lambda syntax is very flexible:
 * if there is only one parameter, then the parenthesis can be omitted
 * if the method body is a single expression, then the `return` keyword and braces can be omitted
 
-```
-@FunctionalInterface
-interface DateChecker {
-  boolean check(LocalDate date);
-}
-
+```java
 public class Sample {
   public static void main(String[] args) {
+    Map<Path, String> ownerByPath = Map.of();
     // long syntax
-    DateChecker isItFriday = (LocalDate date) -> {
-      return date.getDayOfWeek() == DayOfWeek.FRIDAY;
+    PermissionChecker checker = (Path path, String user) -> {
+      return ownerByPath.get(path).equals(user);
     };
     // short syntax
-    DateChecker isItFriday = date -> date.getDayOfWeek() == DayOfWeek.FRIDAY;
+    PermissionChecker checker = (path, user) -> ownerByPath.get(path).equals(user);
     // usage
-    System.out.println(isItFriday.check(LocalDate.now()));
+    System.out.println("has access: " + checker.hasPermission(Path.of("src"), "theCoder"));
   }
 }
 ```
@@ -275,26 +318,23 @@ public class Sample {
 
 Method expressions provide a way to implement a functional interface using an existing method.
 
-```
+```java
 package app;
 
-public class Sample {
+public class SmarterApplication {
 
-  private static void printStaticIdentity() {
-    System.out.println("What am I? A regular static method.");
+  final Map<Path, String> ownerByPath  = Map.of(
+      Path.of("src"), "theCoder",
+      Path.of("docs"), "theWriter"
+  );
+
+  boolean isOwnedBy(Path path, String user) {
+    return ownerByPath.get(path).equals(user);
   }
 
-  private void printInstanceIdentity() {
-    System.out.println("What am I? A regular non-static method.");
-  }
-
-  public static void main(String[] args) {
-    Runnable r1 = Sample::printStaticIdentity;
-    r1.run();
-
-    Sample s = new Sample();
-    Runnable r2 = s::printInstanceIdentity;
-    r2.run();
+  public void start() {
+    PermissionChecker checker = this::isOwnedBy; // method reference
+    new FileServer(checker).start();
   }
 }
 ```
