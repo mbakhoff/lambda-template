@@ -380,7 +380,7 @@ Java has some useful built-in functional interfaces:
 
 ### 2. FileEditor
 
-1. Write a method `edit` that takes three parameters: a transformer (`Function<String, String>`), an input file and an output file (both `java.nio.file.Path`).
+1. Write a method `edit` that takes three parameters: an input file, an output file (both `java.nio.file.Path`) and a transformer (`Function<String, String>`).
    The method reads the input file line-by-line.
    It calls the transformer function with each line and appends the returned value to the output file.
 2. Add a method `tabsToSpaces` that replaces each tab (`\t`) with 4 spaces.
@@ -398,12 +398,12 @@ After reading the file, output all the values in the map using the `forEach` met
 
 ### 4. Hand crafted map-filter
 
-1. Write a generic method `filter` that takes two parameters: `List<T>` and `Predicate<T>`.
-   The method should call the given predicate with all the elements in the given list and return a new `List<T>`.
+1. Write a method `filter` that takes two parameters: `List<String>` and `Predicate<String>`.
+   The method should call the given predicate with all the elements in the given list and return a new `List<String>`.
    The new list should contain only the elements for which the the predicate returned true.
-2. Write a generic method `map` that takes two parameters: `List<T>` and `Function<T,U>`.
-   The method should call the given function with all the elements in the given list and return a new `List<U>` containing the results.
-3. Write a main method that creates a list of strings, each containing some number (e.g `"-100"`, `"100"`).
-   Use `map` to convert all numbers to integers.
-   Then use `filter` to keep only positive values.
+2. Write a method `map` that takes two parameters: `List<String>` and `Function<String, String>`.
+   The method should call the given function with all the elements in the given list and return a new `List<String>` containing the results.
+3. Write a main method that creates some list of strings.
+   Use `map` on the list with a lambda function that reverses the given string.
+   Then use `filter` on the result to keep only the strings that are longer than 3.
    Finally output all the filtered values using the `forEach` method of the list.
